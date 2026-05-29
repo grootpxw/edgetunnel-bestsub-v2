@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html class="dark" lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EdgeTunnel BestSub v2</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <script src="/static/lucide.min.js"></script>
+  <link rel="stylesheet" href="/static/style-v2.css">
+</head>
+<body>
+  <!-- Side Navigation -->
+  <nav class="sidenav">
+    <div class="sidenav-header">
+      <div>
+        <h1 class="sidenav-title">
+          <span data-zh>网络控制</span>
+          <span data-en>Network Control</span>
+        </h1>
+        <p class="sidenav-subtitle">
+          <span data-zh>管理员模式</span>
+          <span data-en>Admin Mode</span>
+        </p>
+      </div>
+      <button class="lang-toggle" id="langToggle">EN</button>
+    </div>
+    <div class="sidenav-menu">
+      <a href="#" class="sidenav-item active">
+        <i data-lucide="zap"></i>
+        <span data-zh>IP 优选</span>
+        <span data-en>IP Selection</span>
+      </a>
+    </div>
+    <div class="sidenav-footer">
+      <button class="btn-primary btn-block" id="runBtn">
+        <i data-lucide="play"></i>
+        <span data-zh>开始测速</span>
+        <span data-en>Start Probe</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <header class="mobile-header">
+      <div class="mobile-header-title">EdgeTunnel BestSub v2</div>
+      <button class="lang-toggle" id="langToggleMobile">EN</button>
+    </header>
+
+    <div class="container">
+      <header class="page-header">
+        <h2 class="page-title">
+          <span data-zh>IP 优选控制台</span>
+          <span data-en>IP Selection Console</span>
+        </h2>
+        <p class="page-subtitle">
+          <span data-zh>优化路由路径并管理边缘配置</span>
+          <span data-en>Optimize routing paths and manage edge configurations</span>
+        </p>
+      </header>
+
+      <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+        <span id="loadingText">
+          <span data-zh>测速任务运行中...</span>
+          <span data-en>Probe task running...</span>
+        </span>
+      </div>
+
+      <div class="grid-3col">
+        <div class="card" id="envPanel">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span data-zh>环境状态</span>
+              <span data-en>Environment Status</span>
+            </h3>
+            <i data-lucide="activity"></i>
+          </div>
+          <div class="card-body">
+            <div id="envSummary" class="env-summary pending">
+              <span data-zh>尚未执行检测</span>
+              <span data-en>Not checked yet</span>
+            </div>
+            <ul id="envChecks" class="env-checks"></ul>
+            <button class="btn-secondary btn-sm" id="checkBtn">
+              <span data-zh>重新检测</span>
+              <span data-en>Re-check</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="card col-span-2">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span data-zh>优选引擎</span>
+              <span data-en>Optimization Engine</span>
+            </h3>
+          </div>
+          <div class="card-body">
+            <div class="mode-toggle" id="modeToggle">
+              <button class="mode-option selected" data-mode="quick">
+                <span data-zh>快速模式</span>
+                <span data-en>Quick Mode</span>
+              </button>
+              <button class="mode-option" data-mode="stable">
+                <span data-zh>稳定模式</span>
+                <span data-en>Stable Mode</span>
+              </button>
+            </div>
+
+            <div id="progressContainer" class="progress-container">
+              <div class="progress-info">
+                <span id="progressStatus" class="progress-status">
+                  <span data-zh>就绪</span>
+                  <span data-en>Ready</span>
+                </span>
+                <span id="progressPercent" class="progress-percent">0%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" id="progressBarFill"></div>
+              </div>
+            </div>
+
+            <div class="btn-group">
+              <button class="btn-secondary" id="clashBtn">
+                <i data-lucide="file-text"></i>
+                <span data-zh>生成 Clash</span>
+                <span data-en>Generate Clash</span>
+              </button>
+              <button class="btn-secondary" id="pushBtn">
+                <i data-lucide="cloud-upload"></i>
+                <span data-zh>推送 Worker</span>
+                <span data-en>Push Worker</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span data-zh>目标地区</span>
+              <span data-en>Target Regions</span>
+            </h3>
+            <button class="btn-link" id="clearCountryBtn">
+              <span data-zh>重置</span>
+              <span data-en>Reset</span>
+            </button>
+          </div>
+          <div class="card-body">
+            <div id="countrySelect" class="country-grid"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span data-zh>反向代理 (ProxyIP)</span>
+              <span data-en>Reverse Proxy (ProxyIP)</span>
+            </h3>
+          </div>
+          <div class="card-body">
+            <div class="input-group">
+              <div class="proxyip-dropdown" id="proxyipDropdown">
+                <button class="dropdown-trigger" id="proxyipDropdownTrigger">
+                  <span id="proxyipDropdownLabel">🇺🇸 美国 (US)</span>
+                  <i data-lucide="chevron-down"></i>
+                </button>
+                <div class="dropdown-menu hidden" id="proxyipDropdownMenu"></div>
+              </div>
+              <button class="btn-secondary" id="proxyipFetchBtn">
+                <i data-lucide="refresh-cw"></i>
+                <span data-zh>优选</span>
+                <span data-en>Fetch</span>
+              </button>
+            </div>
+            <div id="proxyipSummary" class="proxyip-summary muted">
+              <span data-zh>优选后会显示可推送的 PROXYIP</span>
+              <span data-en>ProxyIP will be shown after optimization</span>
+            </div>
+            <button class="btn-secondary btn-block" id="proxyPushBtn" disabled>
+              <i data-lucide="upload"></i>
+              <span data-zh>推送 PROXYIP</span>
+              <span data-en>Push PROXYIP</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span data-zh>核心配置</span>
+            <span data-en>Core Configuration</span>
+          </h3>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <button class="btn-link" id="editConfigBtn">
+              <i data-lucide="edit-3"></i>
+              <span data-zh>编辑</span>
+              <span data-en>Edit</span>
+            </button>
+            <button class="btn-secondary btn-sm hidden" id="saveConfigBtn">
+              <i data-lucide="save"></i>
+              <span data-zh>保存</span>
+              <span data-en>Save</span>
+            </button>
+            <button class="btn-link hidden" id="cancelConfigBtn">
+              <span data-zh>取消</span>
+              <span data-en>Cancel</span>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <dl id="configView" class="config-grid"></dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span data-zh>精选结果</span>
+            <span data-en>Optimized Results</span>
+          </h3>
+          <a href="/api/results/add.txt" target="_blank" class="btn-link">
+            <span data-zh>获取 ADD.txt</span>
+            <span data-en>Get ADD.txt</span>
+            <i data-lucide="external-link"></i>
+          </a>
+        </div>
+        <div class="card-body">
+          <div class="table-wrapper">
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th><span data-zh>节点地址</span><span data-en>IP Address</span></th>
+                  <th><span data-zh>端口</span><span data-en>Port</span></th>
+                  <th><span data-zh>延迟</span><span data-en>Latency</span></th>
+                  <th><span data-zh>机房</span><span data-en>Colo</span></th>
+                  <th><span data-zh>地区</span><span data-en>Region</span></th>
+                  <th><span data-zh>状态</span><span data-en>Status</span></th>
+                  <th><span data-zh>来源</span><span data-en>Source</span></th>
+                </tr>
+              </thead>
+              <tbody id="resultRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-icon" id="modalIcon"></div>
+      <h3 id="modalTitle">提示</h3>
+      <p id="modalMessage"></p>
+      <div class="modal-actions">
+        <button id="modalOkBtn" class="btn-primary">
+          <span data-zh>好</span>
+          <span data-en>OK</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  </script>
+  <script src="/static/app.js"></script>
+  <script src="/static/i18n.js"></script>
+</body>
+</html>
