@@ -9,8 +9,33 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            ext: .exe
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            ext: ""
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            ext: ""
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            ext: ""
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            ext: ""
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -22,20 +47,62 @@ jobs:
           go-version-file: go.mod
 
       - name: Test
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
         run: go test ./...
 
       - name: Build
-        run: go build -ldflags="-s -w" -o dist/bestsub-windows-amd64/bestsub.exe ./cmd/bestsub
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        shell: bash
+        run: |
+          mkdir -p dist/package/configs
+          go build -ldflags="-s -w" -o dist/package/bestsub${{ matrix.ext }} ./cmd/bestsub
 
-      - name: Package
+      - name: Package assets
+        shell: bash
+        run: |
+          cp configs/config.example.yaml dist/package/configs/config.yaml
+          cp README.md dist/package/README.md
+
+      - name: Archive (unix)
+        if: matrix.goos != 'windows'
+        shell: bash
+        run: |
+          zip -rj dist/bestsub-${{ matrix.goos }}-${{ matrix.goarch }}.zip dist/package/*
+
+      - name: Archive (windows)
+        if: matrix.goos == 'windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist/bestsub-windows-amd64/configs | Out-Null
-          Copy-Item configs/config.example.yaml dist/bestsub-windows-amd64/configs/config.yaml
-          Copy-Item README.md dist/bestsub-windows-amd64/README.md
-          Compress-Archive -Path dist/bestsub-windows-amd64/* -DestinationPath dist/bestsub-windows-amd64.zip -Force
+          Compress-Archive -Path dist/package/* -DestinationPath dist/bestsub-${{ matrix.goos }}-${{ matrix.goarch }}.zip -Force
 
-      - name: Publish Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/bestsub-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all release archives
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/artifacts
+
+      - name: Prepare release files
+        shell: bash
+        run: |
+          mkdir -p dist/release
+          find dist/artifacts -type f -name '*.zip' -exec cp {} dist/release/ \;
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/bestsub-windows-amd64.zip
+          files: dist/release/*.zip
