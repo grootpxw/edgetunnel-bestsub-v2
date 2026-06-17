@@ -77,6 +77,7 @@ func Build(cfg config.Config, results []probe.Result) (string, error) {
 			"store-fake-ip":  true,
 		},
 		"dns":          dnsBlock(cfg),
+		"tun":          tunBlock(),
 		"port":         7890,
 		"socks-port":   7891,
 		"allow-lan":    true,
@@ -92,6 +93,18 @@ func Build(cfg config.Config, results []probe.Result) (string, error) {
 		return "", err
 	}
 	return string(out), nil
+}
+
+func tunBlock() map[string]any {
+	return map[string]any{
+		"enable":                true,
+		"stack":                 "gvisor",
+		"auto-route":            true,
+		"auto-detect-interface": true,
+		"strict-route":          true,
+		"dns-hijack":            []string{"any:53", "tcp://any:53"},
+		"mtu":                   1500,
+	}
 }
 
 func successful(results []probe.Result) []probe.Result {
@@ -322,24 +335,48 @@ func resolveRules(cfg config.Config) []string {
 
 func dnsBlock(cfg config.Config) map[string]any {
 	host := strings.TrimSpace(cfg.Clash.Host)
+	domesticNameservers := []string{"https://dns.alidns.com/dns-query", "https://doh.pub/dns-query"}
+	proxiedNameservers := []string{
+		"https://1.1.1.1/dns-query#" + autoSelectGroup,
+		"https://dns.google/dns-query#" + autoSelectGroup,
+	}
 	policy := map[string]any{}
 	if host != "" {
-		policy[host] = []string{"https://dns.alidns.com/dns-query", "https://doh.pub/dns-query"}
+		policy[host] = domesticNameservers
 	}
 	if cfg.Clash.ECH && cfg.Clash.ECHSNI != "" {
-		policy[cfg.Clash.ECHSNI] = []string{"https://dns.alidns.com/dns-query", "https://doh.pub/dns-query"}
+		policy[cfg.Clash.ECHSNI] = domesticNameservers
 	}
 	return map[string]any{
-		"enable":             true,
-		"default-nameserver": []string{"223.5.5.5", "119.29.29.29", "114.114.114.114"},
-		"use-hosts":          true,
-		"nameserver":         []string{"https://dns.alidns.com/dns-query", "https://doh.pub/dns-query"},
-		"fallback":           []string{"8.8.4.4", "208.67.220.220"},
+		"enable":                  true,
+		"listen":                  "0.0.0.0:1053",
+		"ipv6":                    false,
+		"enhanced-mode":           "fake-ip",
+		"fake-ip-range":           "198.18.0.1/16",
+		"default-nameserver":      []string{"223.5.5.5", "119.29.29.29"},
+		"use-hosts":               true,
+		"proxy-server-nameserver": domesticNameservers,
+		"nameserver":              proxiedNameservers,
+		"fallback":                proxiedNameservers,
 		"fallback-filter": map[string]any{
 			"geoip":      true,
 			"geoip-code": "CN",
 			"ipcidr":     []string{"240.0.0.0/4", "127.0.0.1/32", "0.0.0.0/32"},
-			"domain":     []string{"+.google.com", "+.facebook.com", "+.youtube.com"},
+			"domain": []string{
+				"+.google.com",
+				"+.gstatic.com",
+				"+.googleapis.com",
+				"+.facebook.com",
+				"+.fbcdn.net",
+				"+.youtube.com",
+				"+.ytimg.com",
+				"+.x.com",
+				"+.twitter.com",
+				"+.openai.com",
+				"+.chatgpt.com",
+				"+.github.com",
+				"+.cloudflare.com",
+			},
 		},
 		"nameserver-policy": policy,
 	}
